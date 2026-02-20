@@ -1,7 +1,7 @@
-// components/CheckoutPanel.jsx
-import React from 'react';
+import React, { useEffect, useCallback } from 'react';
 
 export default function CheckoutPanel({ 
+  subtotal,           // 確保名稱為 subtotal
   finalTotal, 
   receivedAmount, 
   setReceivedAmount, 
@@ -9,62 +9,149 @@ export default function CheckoutPanel({
   paymentMethod, 
   setPaymentMethod, 
   discountAmount, 
+  setDiscountAmount,
   discountPercent, 
+  setDiscountPercent,
   onOpenNumpad, 
-  onCheckout, 
+  onCheckout,         // 確保有接收此 function
   onOpenCashDrawer,
-  cartLength
+  cartLength,
+  isModalOpen 
 }) {
+
+  // --- 實體鍵盤邏輯處理 ---
+  const handlePhysicalKeyboard = useCallback((e) => {
+    if (isModalOpen || e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+    const key = e.key;
+
+    if (/[0-9]/.test(key)) {
+      setReceivedAmount(prev => prev + key);
+    }
+    
+    if (key === 'Backspace') {
+      setReceivedAmount(prev => prev.toString().slice(0, -1));
+    }
+
+    if (key === 'Escape') {
+      setReceivedAmount('');
+    }
+
+    if (key === 'Enter') {
+      if (change >= 0 && cartLength > 0 && onCheckout) {
+        onCheckout();
+      }
+    }
+  }, [isModalOpen, change, cartLength, onCheckout, setReceivedAmount]);
+
+  useEffect(() => {
+    window.addEventListener('keydown', handlePhysicalKeyboard);
+    return () => window.removeEventListener('keydown', handlePhysicalKeyboard);
+  }, [handlePhysicalKeyboard]);
+
+
   return (
-    <div className="w-[450px] flex flex-col bg-white shadow-2xl z-10">
-      {/* 頂部功能按鈕 */}
-      <div className="h-24 p-4 bg-white border-b flex gap-3 items-center">
+    <div className="w-[450px] flex flex-col bg-white shadow-2xl z-10 border-l border-slate-200 select-none">
+      
+      {/* 1. 頂部管理功能 */}
+      <div className="h-20 p-4 bg-white border-b flex gap-3 items-center shrink-0">
         <button 
-          onClick={() => onOpenNumpad('雜支支出', 0, (v, r) => console.log("支出:", v, r))} 
-          className="flex-1 h-14 bg-rose-50 text-rose-600 rounded-xl font-black text-lg border border-rose-100 active:scale-95 transition-transform"
+          onClick={() => onOpenNumpad('雜支支出', 0, (v) => console.log("支出:", v))} 
+          className="flex-1 h-12 bg-slate-50 text-slate-500 rounded-xl font-bold text-sm border border-slate-200 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-100 transition-all"
         >
-          💸 支出
+          💸 支出登記
         </button>
         <button 
           onClick={onOpenCashDrawer} 
-          className="flex-1 h-14 bg-amber-50 text-amber-600 rounded-xl font-black text-lg border border-amber-100 active:scale-95 transition-transform"
+          className="flex-1 h-12 bg-slate-50 text-slate-500 rounded-xl font-bold text-sm border border-slate-200 hover:bg-amber-50 hover:text-amber-600 hover:border-amber-100 transition-all"
         >
           🔓 開錢箱
         </button>
       </div>
 
-      {/* 應付金額與找零顯示 */}
-      <div className="p-6 space-y-4 text-right">
-        <div className="flex flex-col">
-          <span className="text-slate-400 font-black text-xs uppercase tracking-widest mb-1">Payable Amount</span>
-          <span className="text-7xl font-black text-slate-900 font-mono tracking-tighter leading-none">
-            ${finalTotal.toLocaleString()}
+      {/* 2. 金額計算與優惠 (層次化佈局) */}
+      <div className="bg-slate-50 p-6 border-b space-y-4">
+        {/* 第一層：商品小計 */}
+        <div className="flex justify-between items-center text-slate-400 font-bold text-sm">
+          <span>商品小計:</span>
+          <span className="font-mono text-base">${(subtotal || 0).toLocaleString()}</span>
+        </div>
+
+        {/* 第二層：折扣/折讓按鈕 */}
+        <div className="grid grid-cols-2 gap-3">
+          <button 
+            onClick={() => onOpenNumpad("設定折讓", discountAmount, (v) => setDiscountAmount(Number(v)))} 
+            className="flex flex-col items-center justify-center py-2 px-4 border-2 border-slate-200 rounded-2xl bg-white hover:border-blue-400 transition-all group"
+          >
+            <span className="text-[10px] text-slate-400 group-hover:text-blue-500 font-black uppercase tracking-widest">Discount / 折讓</span>
+            <span className="text-lg font-black text-slate-700">-${discountAmount}</span>
+          </button>
+          <button 
+            onClick={() => onOpenNumpad("設定折扣%", discountPercent, (v) => setDiscountPercent(Number(v)))} 
+            className="flex flex-col items-center justify-center py-2 px-4 border-2 border-slate-200 rounded-2xl bg-white hover:border-blue-400 transition-all group"
+          >
+            <span className="text-[10px] text-slate-400 group-hover:text-blue-500 font-black uppercase tracking-widest">Percent / 折扣</span>
+            <span className="text-lg font-black text-slate-700">{discountPercent}%</span>
+          </button>
+        </div>
+
+        {/* 第三層：最終應收 (醒目顯示) */}
+        <div className="flex justify-between items-end pt-2 border-t border-slate-200">
+          <span className="text-slate-600 font-black text-lg">應收金額:</span>
+          <span className="text-4xl font-black text-blue-600 font-mono tracking-tighter">
+            ${(finalTotal || 0).toLocaleString()}
           </span>
         </div>
-        
-        <div className="grid grid-cols-2 gap-3">
-          <div className="p-4 bg-slate-900 rounded-2xl text-white shadow-lg text-left border-b-4 border-blue-500">
-            <div className="text-[10px] font-black text-blue-400 mb-1 uppercase">Received</div>
-            <div className="text-4xl font-black font-mono">${receivedAmount || '0'}</div>
+      </div>
+      
+      {/* 3. 收銀核心區 (實收、找零、虛擬鍵盤) */}
+      <div className="p-6 bg-slate-900 text-white space-y-6 shadow-inner flex-1 overflow-y-auto">
+        {/* 金額顯示 */}
+        <div className="grid grid-cols-2 gap-6">
+          <div className="space-y-1">
+            <span className="text-[10px] font-black text-slate-500 tracking-widest block uppercase">Received / 實收</span>
+            <div className="text-5xl font-black font-mono text-emerald-400 tracking-tighter">
+              ${receivedAmount || '0'}
+            </div>
           </div>
-          <div className="p-4 bg-white rounded-2xl text-slate-800 shadow-md text-right border-2 border-slate-100">
-            <div className="text-[10px] font-black text-slate-400 mb-1 uppercase">Change</div>
-            <div className="text-4xl font-black font-mono text-green-600">
-              ${change >= 0 ? change.toLocaleString() : 0}
+          <div className="space-y-1 text-right border-l border-slate-800 pl-6">
+            <span className="text-[10px] font-black text-slate-500 tracking-widest block uppercase">Change / 找零</span>
+            <div className={`text-5xl font-black font-mono tracking-tighter ${change < 0 ? 'text-rose-500/30' : 'text-amber-400'}`}>
+              ${change >= 0 ? change.toLocaleString() : '0'}
             </div>
           </div>
         </div>
 
-        {/* 支付方式切換 */}
-        <div className="grid grid-cols-3 gap-2 pt-2">
-          {['現金', '轉帳', '刷卡'].map(m => (
+        {/* 虛擬小鍵盤區 (新增) */}
+        <div className="grid grid-cols-3 gap-2">
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 'C', 0, '00'].map((num) => (
+            <button
+              key={num}
+              onClick={() => {
+                if (num === 'C') setReceivedAmount('');
+                else setReceivedAmount(prev => prev.toString() + num.toString());
+              }}
+              className={`h-14 rounded-xl font-black text-xl transition-all active:scale-95 ${
+                num === 'C' 
+                ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' 
+                : 'bg-white/10 text-white border border-white/10 hover:bg-white/20'
+              }`}
+            >
+              {num}
+            </button>
+          ))}
+        </div>
+
+        {/* 支付方式 */}
+        <div className="grid grid-cols-3 gap-2 py-2 border-t border-white/10 pt-4">
+          {['現金支付', '銀行轉帳', '信用卡'].map((m) => (
             <button 
               key={m} 
               onClick={() => setPaymentMethod(m)} 
-              className={`py-3 rounded-xl font-black text-lg border-2 transition-all ${
+              className={`py-4 rounded-xl font-black text-xs border-2 transition-all ${
                 paymentMethod === m 
-                  ? 'bg-blue-600 text-white border-blue-700 shadow-lg scale-105' 
-                  : 'bg-slate-50 text-slate-400 border-transparent hover:bg-slate-100'
+                  ? 'bg-blue-600 text-white border-blue-400 shadow-[0_0_15px_rgba(37,99,235,0.4)]' 
+                  : 'bg-slate-800 text-slate-500 border-transparent hover:text-slate-300'
               }`}
             >
               {m}
@@ -73,53 +160,18 @@ export default function CheckoutPanel({
         </div>
       </div>
 
-      {/* 數字輸入鍵盤 */}
-      <div className="flex-1 bg-slate-50 border-y border-slate-200 p-4">
-        <div className="grid grid-cols-3 gap-2 h-full">
-          {[1, 2, 3, 4, 5, 6, 7, 8, 9, '0', '00'].map(num => (
-            <button 
-              key={num} 
-              onClick={() => setReceivedAmount(prev => prev + num)} 
-              className="bg-white rounded-2xl text-3xl font-black text-slate-700 shadow-sm border-b-4 border-slate-200 active:border-b-0 active:translate-y-1 transition-all"
-            >
-              {num}
-            </button>
-          ))}
-          <button 
-            onClick={() => setReceivedAmount('')} 
-            className="bg-rose-100 text-rose-600 rounded-2xl text-xl font-black active:translate-y-1 shadow-sm"
-          >
-            清空
-          </button>
-        </div>
-      </div>
-
-      {/* 底部折扣與結帳 */}
-      <div className="p-6 bg-white space-y-4">
-        <div className="grid grid-cols-2 gap-3 text-center">
-          <button 
-            onClick={() => onOpenNumpad('折讓金額', discountAmount, v => console.log("折讓:", v))} 
-            className="py-3 bg-white text-rose-600 rounded-xl font-black border border-rose-100 shadow-sm hover:bg-rose-50"
-          >
-            折讓 -${discountAmount}
-          </button>
-          <button 
-            onClick={() => onOpenNumpad('折扣比例', discountPercent, v => console.log("折扣:", v))} 
-            className="py-3 bg-white text-orange-600 rounded-xl font-black border border-orange-100 shadow-sm hover:bg-orange-50"
-          >
-            折扣 {discountPercent}%
-          </button>
-        </div>
+      {/* 4. 底部結帳按鈕 */}
+      <div className="p-4 bg-white border-t">
         <button 
-          onClick={onCheckout} 
-          disabled={cartLength === 0 || change < 0} 
-          className={`w-full py-7 rounded-[2rem] font-black text-5xl shadow-2xl transition-all ${
-            change >= 0 && cartLength > 0 
-              ? 'bg-blue-600 text-white hover:bg-blue-700 active:scale-95' 
-              : 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-50'
+          onClick={onCheckout}
+          disabled={cartLength === 0 || change < 0}
+          className={`w-full py-6 rounded-[2rem] font-black text-2xl shadow-xl transition-all active:scale-95 ${
+            cartLength > 0 && change >= 0
+              ? 'bg-blue-600 text-white shadow-blue-200 hover:bg-blue-700' 
+              : 'bg-slate-100 text-slate-300 cursor-not-allowed'
           }`}
         >
-          結 帳
+          {change < 0 ? `還差 $${Math.abs(change)}` : '確認結帳 (Enter)'}
         </button>
       </div>
     </div>
