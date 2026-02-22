@@ -1,12 +1,7 @@
+// src/components/CartPanel.jsx
 import React, { useState } from 'react';
 
-export default function CartPanel({
-  cart,
-  onRemoveItem,
-  onClearCart,
-  updateCartItem,
-  onOpenNumpad
-}) {
+export default function CartPanel({ cart, subtotal, finalTotal, onRemoveItem, onClearCart, updateCartItem, onOpenNumpad, onSwitchToCheckout, isTabletMode }) {
   const [isDeleteMode, setIsDeleteMode] = useState(false);
 
   const openEdit = (item, index) => {
@@ -34,13 +29,27 @@ export default function CartPanel({
   };
 
   return (
-    <div className="w-80 lg:w-96 flex flex-col bg-slate-100 border-r border-slate-200 relative h-full">
+    <div className="w-full lg:w-80 xl:w-96 flex flex-col bg-slate-100 lg:border-r border-slate-200 relative h-full">
 
       {/* ── 標題列 h-[72px] (放大10%) ── */}
       <div className="h-[72px] px-4 bg-white border-b border-slate-200 flex items-center justify-between shrink-0">
-        <span className="text-[17px] font-black text-slate-700">
-          🛒 購物清單 <span className="text-slate-400 font-bold text-base">({cart.length})</span>
-        </span>
+        <div className="flex items-center gap-3 h-full">
+          <div className="flex flex-col">
+            <span className="text-[17px] font-black text-slate-700">🛒 購物清單</span>
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{cart.length} ITEMS</span>
+          </div>
+
+          {/* Tablet Toggle Button: Only show if onSwitchToCheckout is provided and screens < xl */}
+          {onSwitchToCheckout && (
+            <button
+              onClick={onSwitchToCheckout}
+              className="xl:hidden flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl font-black text-sm active:scale-95 transition-all shadow-md shadow-blue-200"
+            >
+              結帳 ➔
+            </button>
+          )}
+        </div>
+
         {cart.length > 0 && (
           <div className="flex items-center gap-2">
             {isDeleteMode && (
@@ -54,8 +63,8 @@ export default function CartPanel({
             <button
               onClick={handleClearButtonClick}
               className={`h-9 px-4 rounded-xl font-black text-sm transition-all ${isDeleteMode
-                ? "bg-rose-600 text-white ring-4 ring-rose-100"
-                : "bg-slate-200 text-slate-600 hover:bg-slate-300"
+                  ? "bg-rose-600 text-white ring-4 ring-rose-100"
+                  : "bg-slate-200 text-slate-600 hover:bg-slate-300"
                 }`}
             >
               {isDeleteMode ? "⚠️ 確認清空" : "🗑 編輯"}
@@ -76,34 +85,34 @@ export default function CartPanel({
           </div>
         )}
 
-        {cart.map((品項, 索引) => (
+        {cart.map((item, index) => (
           <div
-            key={索引}
+            key={index}
             className={`rounded-xl border-2 transition-all ${isDeleteMode
-              ? "border-rose-300 bg-rose-50"
-              : "border-white bg-white hover:border-blue-400 active:scale-[0.98] cursor-pointer shadow-sm"
+                ? "border-rose-300 bg-rose-50"
+                : "border-white bg-white hover:border-blue-400 active:scale-[0.98] cursor-pointer shadow-sm"
               }`}
-            onClick={() => !isDeleteMode && openEdit(品項, 索引)}
+            onClick={() => !isDeleteMode && openEdit(item, index)}
           >
             <div className="flex items-center px-3 py-3 gap-3">
               <div className="flex-1 min-w-0">
-                <div className="font-black text-slate-800 text-[15px] leading-tight truncate">{品項.name}</div>
+                <div className="font-black text-slate-800 text-[15px] leading-tight truncate">{item.name}</div>
                 <div className="flex items-center gap-2 mt-1">
-                  <span className="text-[13px] font-bold text-slate-400">${品項.price}</span>
-                  <span className="text-[13px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">×{品項.quantity}</span>
+                  <span className="text-[13px] font-bold text-slate-400">${item.price}</span>
+                  <span className="text-[13px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">×{item.quantity}</span>
                 </div>
               </div>
 
               {isDeleteMode ? (
                 <button
-                  onClick={(e) => { e.stopPropagation(); onRemoveItem(索引); }}
+                  onClick={(e) => { e.stopPropagation(); onRemoveItem(index); }}
                   className="bg-rose-600 text-white px-3 py-1.5 rounded-lg text-sm font-black active:scale-95 shrink-0"
                 >
                   刪除
                 </button>
               ) : (
                 <span className="text-[17px] font-black font-mono text-slate-800 shrink-0">
-                  ${(品項.price * 品項.quantity).toLocaleString()}
+                  ${(item.price * item.quantity).toLocaleString()}
                 </span>
               )}
             </div>
