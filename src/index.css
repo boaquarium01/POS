@@ -6,11 +6,36 @@
     /* 設定微軟正黑體 */
     font-family: "Microsoft JhengHei", "微軟正黑體", sans-serif;
     /* 取代原本出錯的 @apply text-gray-700 */
-    color: #374151; /* 這是 gray-700 的標準色碼 */
-    background-color: #f8fafc; /* 這是 slate-50，讓整體色調更淡雅 */
+    color: #374151;
+    /* 這是 gray-700 的標準色碼 */
+    background-color: #f8fafc;
+    /* 這是 slate-50，讓整體色調更淡雅 */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 }
 
 /* 如果你還是想用 @apply，確保它在 @theme 之後，或直接寫標準 CSS */
+
+/* Wiggle animation for delete mode */
+@keyframes wiggle {
+
+  0%,
+  100% {
+    transform: rotate(-0.5deg);
+  }
+
+  50% {
+    transform: rotate(0.5deg);
+  }
+}
+
+/* No scrollbar utility */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

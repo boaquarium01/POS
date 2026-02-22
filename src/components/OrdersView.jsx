@@ -6,7 +6,7 @@ export default function OrdersView() {
   const [expenses, setExpenses] = useState([])
   const [loading, setLoading] = useState(true)
   const [expandedOrderId, setExpandedOrderId] = useState(null)
-  
+
   // 編輯支出用的狀態
   const [editingExpense, setEditingExpense] = useState(null)
   const [editFormData, setEditFormData] = useState({ amount: '', reason: '' })
@@ -20,18 +20,22 @@ export default function OrdersView() {
   async function fetchData() {
     try {
       setLoading(true)
+      // 計算該日期的本地起點與終點，並轉成 ISO (UTC) 時間字串給 Supabase 查詢
+      const startOfDay = new Date(`${startDate}T00:00:00`).toISOString()
+      const endOfDay = new Date(`${endDate}T23:59:59.999`).toISOString()
+
       const { data: ordersData } = await supabase
         .from('orders')
         .select(`*, members(name), order_items (quantity, price, products ( name ))`)
-        .gte('created_at', `${startDate}T00:00:00`)
-        .lte('created_at', `${endDate}T23:59:59`)
+        .gte('created_at', startOfDay)
+        .lte('created_at', endOfDay)
         .order('created_at', { ascending: false })
-      
+
       const { data: expensesData } = await supabase
         .from('expenses')
         .select('*')
-        .gte('created_at', `${startDate}T00:00:00`)
-        .lte('created_at', `${endDate}T23:59:59`)
+        .gte('created_at', startOfDay)
+        .lte('created_at', endOfDay)
         .order('created_at', { ascending: false })
 
       if (ordersData) setOrders(ordersData)
@@ -82,7 +86,7 @@ export default function OrdersView() {
 
   return (
     <div className="flex flex-col h-full bg-slate-100 overflow-hidden font-sans text-slate-900 relative">
-      
+
       {/* 編輯支出的彈出視窗 (Modal) */}
       {editingExpense && (
         <div className="absolute inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-6">
@@ -90,26 +94,26 @@ export default function OrdersView() {
             <h3 className="text-3xl font-black text-slate-800 flex items-center gap-3">
               <span className="text-rose-500 text-4xl">📝</span> 編輯支出紀錄
             </h3>
-            
+
             <div className="space-y-4">
               <div className="space-y-2">
                 <label className="text-sm font-black text-slate-400 ml-2">支出金額</label>
-                <input 
-                  type="number" 
+                <input
+                  type="number"
                   required
                   className="w-full p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl text-3xl font-black font-mono focus:border-rose-500 outline-none transition-colors"
                   value={editFormData.amount}
-                  onChange={e => setEditFormData({...editFormData, amount: e.target.value})}
+                  onChange={e => setEditFormData({ ...editFormData, amount: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-black text-slate-400 ml-2">支出原因 (Reason)</label>
-                <textarea 
+                <textarea
                   required
                   rows="3"
                   className="w-full p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl text-xl font-black focus:border-rose-500 outline-none transition-colors"
                   value={editFormData.reason}
-                  onChange={e => setEditFormData({...editFormData, reason: e.target.value})}
+                  onChange={e => setEditFormData({ ...editFormData, reason: e.target.value })}
                 />
               </div>
             </div>
@@ -131,7 +135,7 @@ export default function OrdersView() {
         <div className="flex items-center gap-6">
           <h2 className="text-2xl font-black tracking-tighter text-slate-800">帳務分析系統</h2>
           <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
-            <button onClick={() => {setStartDate(todayStr); setEndDate(todayStr)}} className={`px-4 py-1.5 rounded-lg font-black text-xs transition-all ${startDate === todayStr ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800'}`}>今日紀錄</button>
+            <button onClick={() => { setStartDate(todayStr); setEndDate(todayStr) }} className={`px-4 py-1.5 rounded-lg font-black text-xs transition-all ${startDate === todayStr ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800'}`}>今日紀錄</button>
             <button onClick={() => {
               const start = new Date(); start.setDate(start.getDate() - 6);
               setStartDate(start.toLocaleDateString('en-CA')); setEndDate(todayStr);
@@ -143,7 +147,7 @@ export default function OrdersView() {
             <input type="date" className="bg-transparent outline-none" value={endDate} onChange={e => setEndDate(e.target.value)} />
           </div>
         </div>
-        
+
         <div className="flex gap-8">
           <div className="flex flex-col items-end">
             <span className="text-xs font-black text-emerald-600">區間總營收</span>
@@ -158,7 +162,7 @@ export default function OrdersView() {
       </div>
 
       <div className="flex-1 flex overflow-hidden p-6 gap-6">
-        
+
         {/* 左側：銷售流水帳 */}
         <div className="flex-[3] bg-white rounded-[2rem] shadow-xl flex flex-col overflow-hidden border border-slate-200">
           <div className="flex-1 overflow-y-auto no-scrollbar">
@@ -175,7 +179,7 @@ export default function OrdersView() {
               <tbody className="divide-y divide-slate-100">
                 {orders.map(order => (
                   <React.Fragment key={order.id}>
-                    <tr 
+                    <tr
                       className={`hover:bg-blue-50/50 transition-all cursor-pointer ${expandedOrderId === order.id ? 'bg-blue-50' : ''}`}
                       onClick={() => setExpandedOrderId(expandedOrderId === order.id ? null : order.id)}
                     >
@@ -187,11 +191,10 @@ export default function OrdersView() {
                         {order.members?.name || '一般散客'}
                       </td>
                       <td className="p-5 text-center">
-                        <span className={`px-4 py-1.5 rounded-lg font-black text-sm ${
-                          order.payment_method === '現金' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 
-                          order.payment_method === '轉帳' ? 'bg-blue-100 text-blue-700 border border-blue-200' : 
-                          'bg-purple-100 text-purple-700 border border-purple-200'
-                        }`}>
+                        <span className={`px-4 py-1.5 rounded-lg font-black text-sm ${order.payment_method === '現金' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' :
+                            order.payment_method === '轉帳' ? 'bg-blue-100 text-blue-700 border border-blue-200' :
+                              'bg-purple-100 text-purple-700 border border-purple-200'
+                          }`}>
                           {order.payment_method || '現金'}
                         </span>
                       </td>
@@ -209,7 +212,7 @@ export default function OrdersView() {
                             <h4 className="font-black text-blue-700 text-xl border-b-2 border-blue-50 pb-2">🛒 銷售商品細項</h4>
                             {order.order_items?.map((item, idx) => (
                               <div key={idx} className="flex justify-between items-center text-xl font-bold border-b border-slate-50 pb-2">
-                                <div className="text-slate-800">#{idx+1} {item.products?.name}</div>
+                                <div className="text-slate-800">#{idx + 1} {item.products?.name}</div>
                                 <div className="font-mono text-slate-900 flex items-baseline gap-6">
                                   <span className="text-slate-500 text-sm font-black">${item.price} × {item.quantity}</span>
                                   <span className="text-2xl font-black">${(item.price * item.quantity).toLocaleString()}</span>
@@ -233,7 +236,7 @@ export default function OrdersView() {
 
         {/* 右側：金額匯總區 */}
         <div className="w-96 flex flex-col gap-6">
-          
+
           {/* 支付分類統計 */}
           <div className="bg-white p-6 rounded-[2rem] shadow-xl border-2 border-slate-100 space-y-4">
             <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest border-b-2 border-slate-50 pb-3">收款方式統計</h3>
@@ -259,8 +262,8 @@ export default function OrdersView() {
             </div>
             <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-slate-50/50 no-scrollbar">
               {expenses.map(exp => (
-                <div 
-                  key={exp.id} 
+                <div
+                  key={exp.id}
                   onClick={() => handleEditClick(exp)}
                   className="bg-white p-5 rounded-2xl border-2 border-rose-100 shadow-sm hover:border-rose-500 hover:shadow-md transition-all cursor-pointer group"
                 >
