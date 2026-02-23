@@ -10,10 +10,10 @@ import OrdersView from './components/OrdersView'
 import SettingsView from './components/SettingsView'
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('pos') 
-  const [products, setProducts] = useState([])     
+  const [activeTab, setActiveTab] = useState('pos')
+  const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
-  const [stores, setStores] = useState([]) 
+  const [stores, setStores] = useState([])
   const [currentStore, setCurrentStore] = useState(null)
 
   // 1. 初始化：抓取所有分店
@@ -30,7 +30,7 @@ export default function App() {
 
         if (storeData && storeData.length > 0) {
           setStores(storeData);
-          setCurrentStore(storeData[0]); 
+          setCurrentStore(storeData[0]);
         } else {
           // 如果沒有分店，關閉加載
           setLoading(false);
@@ -51,56 +51,56 @@ export default function App() {
   }, [currentStore])
 
   // 在 App.jsx 中更新此函數
-async function fetchProducts() {
-  if (!currentStore) return;
-  setLoading(true);
+  async function fetchProducts() {
+    if (!currentStore) return;
+    setLoading(true);
 
-  try {
-    // 1. 抓取所有商品主檔 (全公司總表)
-    const { data: allProducts, error: prodError } = await supabase
-      .from('products')
-      .select('*')
-      .order('created_at', { ascending: false });
+    try {
+      // 1. 抓取所有商品主檔 (全公司總表)
+      const { data: allProducts, error: prodError } = await supabase
+        .from('products')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-    if (prodError) throw prodError;
+      if (prodError) throw prodError;
 
-    // 2. 抓取所有庫存紀錄 (用來判斷各店上架狀態)
-    const { data: allInventory, error: invError } = await supabase
-      .from('store_inventory')
-      .select('*');
+      // 2. 抓取所有庫存紀錄 (用來判斷各店上架狀態)
+      const { data: allInventory, error: invError } = await supabase
+        .from('store_inventory')
+        .select('*');
 
-    if (invError) throw invError;
+      if (invError) throw invError;
 
-    // 3. 數據揉合：以總表為基礎，掛載「本店資料」與「他店狀態」
-    const formatted = allProducts.map(p => {
-      // 找出本店的庫存紀錄
-      const myInv = allInventory.find(i => i.product_id === p.id && i.store_id === currentStore.id);
-      
-      // 找出這項商品在哪些分店有上架 (供右側面板顯示標籤)
-      const availableStoreIds = allInventory
-        .filter(i => i.product_id === p.id)
-        .map(i => i.store_id);
+      // 3. 數據揉合：以總表為基礎，掛載「本店資料」與「他店狀態」
+      const formatted = allProducts.map(p => {
+        // 找出本店的庫存紀錄
+        const myInv = allInventory.find(i => i.product_id === p.id && i.store_id === currentStore.id);
 
-      return {
-        ...p,
-        // 本店屬性
-        stock: myInv ? myInv.stock : 0,
-        price: myInv?.store_price || p.suggested_price || 0,
-        is_custom_price: !!myInv?.store_price,
-        is_in_current_store: !!myInv, // 關鍵：如果沒這筆紀錄，就是 false
-        
-        // 全域屬性
-        available_in_stores: availableStoreIds
-      };
-    });
+        // 找出這項商品在哪些分店有上架 (供右側面板顯示標籤)
+        const availableStoreIds = allInventory
+          .filter(i => i.product_id === p.id)
+          .map(i => i.store_id);
 
-    setProducts(formatted);
-  } catch (err) {
-    console.error("抓取失敗:", err.message);
-  } finally {
-    setLoading(false);
+        return {
+          ...p,
+          // 本店屬性
+          stock: myInv ? myInv.stock : 0,
+          price: myInv?.store_price || p.suggested_price || 0,
+          is_custom_price: !!myInv?.store_price,
+          is_in_current_store: !!myInv, // 關鍵：如果沒這筆紀錄，就是 false
+
+          // 全域屬性
+          available_in_stores: availableStoreIds
+        };
+      });
+
+      setProducts(formatted);
+    } catch (err) {
+      console.error("抓取失敗:", err.message);
+    } finally {
+      setLoading(false);
+    }
   }
-}
 
   // --- 關鍵保護：如果連分店資訊都還沒拿到，顯示全螢幕讀取 ---
   if (!currentStore && loading) {
@@ -115,60 +115,106 @@ async function fetchProducts() {
   }
 
   return (
-    <div className="flex h-screen w-full bg-gray-100 overflow-hidden text-gray-800">
-      
-      <Sidebar 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
-        currentStore={currentStore}
-        stores={stores}
-        setCurrentStore={setCurrentStore}
-      />
+    <ScaleWrapper>
+      <div className="flex w-[1500px] h-[900px] bg-gray-100 overflow-hidden text-gray-800 shrink-0">
 
-      <main className="flex-1 flex flex-col overflow-hidden relative">
-        
-        {loading && (
-          <div className="absolute inset-0 bg-white/50 backdrop-blur-sm z-50 flex items-center justify-center">
-            <div className="font-black text-blue-600 animate-pulse text-xl">
-              {currentStore?.name}店 資料傳輸中...
+        <Sidebar
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          currentStore={currentStore}
+          stores={stores}
+          setCurrentStore={setCurrentStore}
+        />
+
+        <main className="flex-1 flex flex-col overflow-hidden relative bg-white">
+
+          {loading && (
+            <div className="absolute inset-0 bg-white/50 backdrop-blur-sm z-50 flex items-center justify-center">
+              <div className="font-black text-blue-600 animate-pulse text-xl">
+                {currentStore?.name}店 資料傳輸中...
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* 確保傳入 InventoryView 的 props 都是最新的 */}
-        {activeTab === 'pos' && (
-          <POSView 
-            products={products} 
-            fetchProducts={() => fetchProducts(currentStore?.id)} 
-            currentStore={currentStore}
-          />
-        )}
+          {/* 確保傳入 InventoryView 的 props 都是最新的 */}
+          {activeTab === 'pos' && (
+            <POSView
+              products={products}
+              fetchProducts={() => fetchProducts(currentStore?.id)}
+              currentStore={currentStore}
+            />
+          )}
 
-        {activeTab === 'members' && (
-          <MemberView currentStore={currentStore} />
-        )}
+          {activeTab === 'members' && (
+            <MemberView currentStore={currentStore} />
+          )}
 
-        {activeTab === 'inventory' && (
-          <InventoryView 
-            products={products} 
-            fetchProducts={() => fetchProducts(currentStore?.id)} 
-            currentStore={currentStore}
-            stores={stores} // 確保這裡有傳入 stores 供同步勾選使用
-          />
-        )}
+          {activeTab === 'inventory' && (
+            <InventoryView
+              products={products}
+              fetchProducts={() => fetchProducts(currentStore?.id)}
+              currentStore={currentStore}
+              stores={stores} // 確保這裡有傳入 stores 供同步勾選使用
+            />
+          )}
 
-        {activeTab === 'orders' && (
-          <OrdersView currentStore={currentStore} />
-        )}
+          {activeTab === 'orders' && (
+            <OrdersView currentStore={currentStore} />
+          )}
 
-        {activeTab === 'settings' && (
-          <SettingsView 
-            stores={stores} 
-            currentStore={currentStore} 
-            setCurrentStore={setCurrentStore} 
-          />
-        )}
-      </main>
-    </div>
+          {activeTab === 'settings' && (
+            <SettingsView
+              stores={stores}
+              currentStore={currentStore}
+              setCurrentStore={setCurrentStore}
+            />
+          )}
+        </main>
+      </div>
+    </ScaleWrapper>
   )
+}
+
+// ── 新增: 等比例縮放外層組件 ──
+function ScaleWrapper({ children }) {
+  const [scale, setScale] = useState(1);
+
+  useEffect(() => {
+    const handleResize = () => {
+      // 目標畫布尺寸為 1500x900
+      const targetWidth = 1500;
+      const targetHeight = 900;
+      const windowWidth = window.innerWidth;
+      const windowHeight = window.innerHeight;
+
+      // 找出寬度或高度中比較緊的那一邊的比例
+      const scaleWidth = windowWidth / targetWidth;
+      const scaleHeight = windowHeight / targetHeight;
+      const newScale = Math.min(scaleWidth, scaleHeight);
+
+      // 設定 scale (如果比 1 大可以選擇不放大，或跟著放大；這裡我們允許放大與縮小)
+      setScale(newScale);
+    };
+
+    // 初始化先執行一次
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  return (
+    // 使用 screen 的滿版 wrapper, 並將內容置中顯示
+    <div className="w-screen h-screen flex items-center justify-center bg-slate-900 overflow-hidden">
+      <div
+        style={{
+          transform: `scale(${scale})`,
+          transformOrigin: 'center center',
+          width: '1500px',
+          height: '900px'
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
 }
