@@ -62,6 +62,14 @@ export default function ProductPanel({
     }
   };
 
+  // ✍️ 品名字體自動縮放邏輯：針對三欄佈局進行微調
+  const getFontSize = (name) => {
+    if (name.length <= 4) return 'text-[28px]';      // 短品名
+    if (name.length <= 12) return 'text-[22px]';
+    if (name.length <= 20) return 'text-[19px]';      // 中品名
+    return 'text-[15px] leading-tight';              // 長品名
+  };
+
   const formatDateTime = (dateString) => {
     const d = new Date(dateString);
     return d.toLocaleString('zh-TW', {
@@ -72,10 +80,9 @@ export default function ProductPanel({
 
   return (
     <div className="flex-[1.2] flex flex-col border-r bg-slate-50 min-w-0 relative font-sans">
-
-      {/* ── 頂部導覽列 h-[72px] (原 h-16 放大10%) ── */}
+      
+      {/* ── 頂部導覽列 ── */}
       <div className="h-[72px] px-5 bg-white border-b flex gap-4 items-center z-[60] shrink-0">
-        {/* 搜尋欄：使用 padding 定位，避免圖示錯位 */}
         <div className="relative flex-1 min-w-0">
           <input
             type="text"
@@ -97,7 +104,6 @@ export default function ProductPanel({
           )}
         </div>
 
-        {/* 會員狀態 */}
         {selectedMember ? (
           <div className="flex items-center gap-2 bg-emerald-500 text-white pl-4 pr-2 py-2 rounded-xl shadow-md shrink-0">
             <span className="text-sm font-black">👤 {selectedMember.name}</span>
@@ -137,6 +143,7 @@ export default function ProductPanel({
       <div className="flex-1 overflow-y-auto p-3 no-scrollbar">
         {showHistory ? (
           <div className="space-y-3">
+            {/* ... 歷史紀錄內容保持不變 ... */}
             {memberHistory.length === 0 && (
               <div className="flex flex-col items-center justify-center py-20 text-slate-300">
                 <div className="text-5xl mb-3">📋</div>
@@ -164,8 +171,8 @@ export default function ProductPanel({
             ))}
           </div>
         ) : (
-          /* RWD: 小螢幕2欄，中型3欄，大螢幕4欄 */
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pb-4">
+          /* 核心優化：維持 grid-cols-3 */
+          <div className="grid grid-cols-3 gap-3 pb-4">
             {products.length === 0 && (
               <div className="col-span-full flex flex-col items-center justify-center py-20 text-slate-300">
                 <div className="text-5xl mb-3">📦</div>
@@ -182,25 +189,50 @@ export default function ProductPanel({
               .map(p => {
                 const currentPrice = selectedMember ? (p.member_price || p.price) : p.price;
                 const isNoPrice = !currentPrice || currentPrice === 0;
+                const isDiscounted = selectedMember && p.member_price && p.member_price < p.price;
+                const fontSizeClass = getFontSize(p.name);
+
                 return (
                   <button
                     key={p.id}
                     onClick={() => handleProductClick(p)}
-                    className={`group p-4 rounded-2xl border-2 transition-all active:scale-[0.97] text-left flex flex-col h-[120px] ${isNoPrice
-                      ? 'bg-amber-50 border-amber-200 hover:border-amber-400 hover:shadow-md hover:shadow-amber-100'
-                      : 'bg-white border-slate-100 hover:border-blue-400 hover:shadow-md hover:shadow-blue-100'
-                      }`}
+                    className={`p-3.5 rounded-2xl border-2 transition-all active:scale-[0.96] text-left flex flex-col h-[125px] justify-between shadow-sm ${
+                      isNoPrice
+                        ? 'bg-amber-50 border-amber-200 active:bg-amber-100' 
+                        : 'bg-white border-slate-100 active:bg-slate-50'
+                    }`}
                   >
-                    <span className={`font-black text-[15px] leading-snug flex-1 ${isNoPrice ? 'text-amber-800' : 'text-slate-800'}`}>
-                      {p.name}
-                    </span>
+                    <div className="flex flex-col gap-1">
+                      {/* 品名：改為 line-clamp-3 並優化行高 */}
+          <span className={`font-black leading-[1.1] tracking-tighter line-clamp-3 ${getFontSize(p.name)} ${
+            isNoPrice ? 'text-amber-900' : 'text-slate-800'
+          }`}>
+            {p.name}
+          </span>
+                      {/* 會員標記：僅顯示中文 */}
+                      {isDiscounted && !isNoPrice && (
+                        <span className="text-[11px] text-emerald-600 font-bold">
+                          ● 會員價
+                        </span>
+                      )}
+                    </div>
+                    
                     <div className="mt-auto">
                       {isNoPrice ? (
-                        <span className="text-xl font-black text-amber-500">時價</span>
+                        <span className="text-2xl font-black text-amber-500">時價</span>
                       ) : (
-                        <span className="text-2xl font-black font-mono text-slate-900 group-hover:text-blue-600 transition-colors">
-                          ${currentPrice}
-                        </span>
+                        <div className="flex flex-col">
+                          {isDiscounted && (
+                            <span className="text-[11px] text-slate-300 line-through font-mono">
+                              ${p.price}
+                            </span>
+                          )}
+                          <span className={`text-[26px] font-black font-mono leading-none ${
+                            isDiscounted ? 'text-emerald-500' : 'text-blue-600'
+                          }`}>
+                            ${currentPrice}
+                          </span>
+                        </div>
                       )}
                     </div>
                   </button>
