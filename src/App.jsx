@@ -203,14 +203,15 @@ function ScaleWrapper({ children }) {
   }, []);
 
   return (
-    // 使用 screen 的滿版 wrapper, 並將內容置中顯示
+    // 滿版容器：內容固定 1500×900，僅用 scale 等比例縮放，不讓 flex 壓縮
     <div className="w-screen h-screen flex items-center justify-center bg-slate-900 overflow-hidden">
       <div
         style={{
           transform: `scale(${scale})`,
           transformOrigin: 'center center',
-          width: '1500px',
-          height: '900px'
+          width: 1500,
+          height: 900,
+          flexShrink: 0,  // 禁止被 flex 壓縮，只靠 scale 縮放
         }}
       >
         {children}

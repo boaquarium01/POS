@@ -18,6 +18,28 @@ export default function POSView({ products = [], fetchProducts, fetchOrders }) {
   const [discountAmount, setDiscountAmount] = useState(0);
   const [discountPercent, setDiscountPercent] = useState(100);
 
+  // --- 2b. 結帳完成摘要視窗 ---
+  const [checkoutSummary, setCheckoutSummary] = useState(null);
+
+  // 任意鍵關閉結帳摘要視窗
+  useEffect(() => {
+    if (!checkoutSummary) return;
+    const handleKey = () => setCheckoutSummary(null);
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [checkoutSummary]);
+
+  // 結帳摘要清單動態字級：品項少時放大、品項多時縮小
+  const summaryItemCount = checkoutSummary?.items?.length || 0;
+  const baseRowFont = 14; // px
+  let summaryRowFontScale = 1;
+  if (summaryItemCount > 0 && summaryItemCount <= 12) {
+    summaryRowFontScale = 1 + ((12 - summaryItemCount) / 12) * 0.4;
+  } else if (summaryItemCount > 12) {
+    summaryRowFontScale = 1 - Math.min(0.4, ((summaryItemCount - 12) / 12) * 0.4);
+  }
+  const summaryRowFontSize = baseRowFont * summaryRowFontScale;
+
   // --- 3. 彈窗控制 (中控式 Numpad) ---
   const [modalType, setModalType] = useState(null); // 'numpad' | 'expense' | 'cart_edit'
   const [numpadTitle, setNumpadTitle] = useState('');
@@ -161,6 +183,19 @@ export default function POSView({ products = [], fetchProducts, fetchOrders }) {
   const finalTotal = Math.max(0, Math.round(subtotal * (discountPercent / 100)) - discountAmount);
   const change = receivedAmount ? parseFloat(receivedAmount) - finalTotal : 0;
 
+  const formatDateTime = (dateString) => {
+    const d = new Date(dateString);
+    return d.toLocaleString('zh-TW', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+  };
+
   // --- 7. 購物車與結帳動作 ---
   const addToCart = (p) => {
     const price = selectedMember ? (p.member_price || p.price) : p.price;
@@ -177,19 +212,24 @@ export default function POSView({ products = [], fetchProducts, fetchOrders }) {
 
   const checkout = async () => {
     if (cart.length === 0 || change < 0) return;
+
+    // 先拍一份快照，避免之後清空購物車後看不到本次內容
+    const cartSnapshot = cart.map(item => ({ ...item }));
+    const memberSnapshot = selectedMember;
+
     try {
       // 1. 先建立訂單主檔
       const { data: orderData, error: orderError } = await supabase.from('orders').insert([{
         total_amount: finalTotal,
         payment_method: paymentMethod,
-        member_id: selectedMember?.id || null,
+        member_id: memberSnapshot?.id || null,
         discount_info: `折扣: $${discountAmount} / ${discountPercent}%`
       }]).select().single();
 
       if (orderError) throw orderError;
 
       // 2. 準備明細陣列並寫入 order_items (Schema 要求欄位：order_id, product_id, quantity, price)
-      const orderItemsToInsert = cart.map(item => ({
+      const orderItemsToInsert = cartSnapshot.map(item => ({
         order_id: orderData.id,
         product_id: item.id,
         quantity: item.quantity,
@@ -200,8 +240,29 @@ export default function POSView({ products = [], fetchProducts, fetchOrders }) {
 
       if (itemsError) throw itemsError;
 
-      alert("結帳完成");
-      setCart([]); setReceivedAmount(''); setSelectedMember(null); setDiscountAmount(0); setDiscountPercent(100);
+      // 3. 顯示結帳完成摘要視窗
+      setCheckoutSummary({
+        createdAt: orderData.created_at,
+        memberName: memberSnapshot?.name || '一般散客',
+        memberPhone: memberSnapshot?.phone || '',
+        items: cartSnapshot.map(item => ({
+          id: item.id,
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+          total: Number(item.price) * item.quantity,
+        })),
+        subtotal,
+        discountAmount,
+        finalTotal,
+        paymentMethod,
+      });
+
+      setCart([]);
+      setReceivedAmount('');
+      setSelectedMember(null);
+      setDiscountAmount(0);
+      setDiscountPercent(100);
       if (typeof fetchOrders === 'function') fetchOrders();
     } catch (err) {
       alert("失敗: " + err.message);
@@ -209,7 +270,7 @@ export default function POSView({ products = [], fetchProducts, fetchOrders }) {
   };
 
   return (
-    <div className="flex h-screen bg-slate-100 overflow-hidden font-sans">
+    <div className="flex h-full bg-slate-100 overflow-hidden font-sans">
 
       {/* 統一中控彈窗 */}
       {modalType && (
@@ -323,6 +384,121 @@ export default function POSView({ products = [], fetchProducts, fetchOrders }) {
                   className="py-4 bg-blue-600 text-white rounded-2xl font-black text-lg shadow-lg active:scale-95"
                 >
                   確認 (Enter)
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 結帳完成摘要彈窗：幾乎滿版，重點顯示清單與底部橫向金額總結 */}
+      {checkoutSummary && (
+        <div
+          className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4"
+          onClick={() => setCheckoutSummary(null)}
+        >
+          <div
+            className="bg-white w-[48vw] max-w-3xl min-w-[320px] h-[98vh] max-h-[98vh] rounded-[2.5rem] shadow-2xl border border-white animate-in zoom-in duration-200 flex flex-col gap-4 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* 標題 + 日期時間 */}
+            <div className="flex items-center justify-between gap-4 border-b border-slate-100 pb-3 pt-4 px-6 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-emerald-500 flex items-center justify-center text-2xl">
+                  ✅
+                </div>
+                <div className="space-y-1">
+                  <div className="text-base font-black text-emerald-700 tracking-widest uppercase">
+                    結帳完成
+                  </div>
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100">
+                    <span className="text-[11px] font-black text-slate-500">日期時間</span>
+                    <span className="text-sm font-mono font-black text-slate-800">
+                      {checkoutSummary.createdAt
+                        ? formatDateTime(checkoutSummary.createdAt)
+                        : formatDateTime(new Date().toISOString())}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 客戶資訊列 */}
+            <div className="px-6 shrink-0">
+              <div className="bg-slate-50 rounded-2xl px-4 py-3 flex justify-between items-center text-sm">
+                <div className="space-y-1">
+                  <div className="font-black text-slate-700 text-sm">
+                    客戶：{checkoutSummary.memberName}
+                  </div>
+                  <div className="text-xs font-mono text-slate-500">
+                    手機：{checkoutSummary.memberPhone || '—'}
+                  </div>
+                </div>
+                <div className="text-right text-xs font-black text-slate-400">
+                  支付方式
+                  <div className="mt-0.5 text-sm font-black text-slate-800">
+                    {checkoutSummary.paymentMethod}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 購物清單：中間主體，可捲動（字級依品項數動態調整） */}
+            <div className="px-6 flex-1 min-h-0">
+              <div className="border-2 border-slate-100 rounded-2xl overflow-hidden h-full flex flex-col">
+                {/* 表頭 */}
+                <div className="bg-slate-50 px-4 py-2 text-xs font-black text-slate-500 flex shrink-0">
+                  <div className="flex-1">品名</div>
+                  <div className="w-16 text-right">數量</div>
+                  <div className="w-24 text-right">單價</div>
+                  <div className="w-28 text-right">總價</div>
+                </div>
+                {/* 清單內容 */}
+                <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-slate-100 no-scrollbar">
+                  {checkoutSummary.items.map((item, idx) => (
+                    <div
+                      key={item.id || idx}
+                      className="px-4 py-2 font-bold text-slate-700 flex items-baseline"
+                      style={{ fontSize: `${summaryRowFontSize}px` }}
+                    >
+                      <div className="flex-1 truncate pr-3">{item.name}</div>
+                      <div className="w-16 text-right font-mono">{item.quantity}</div>
+                      <div className="w-24 text-right font-mono">
+                        ${Number(item.price).toLocaleString()}
+                      </div>
+                      <div className="w-28 text-right font-mono text-slate-900">
+                        ${Number(item.total).toLocaleString()}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* 底部：小計 + 應收金額 與 確認按鈕同列 */}
+            <div className="px-6 pb-6 pt-4 shrink-0">
+              <div className="bg-slate-50 rounded-2xl px-5 py-4 flex items-center justify-between gap-4 border border-slate-200">
+                <div className="flex flex-col text-slate-500">
+                  <span className="text-[10px] font-bold tracking-wide uppercase">小計</span>
+                  <span className="text-sm font-mono font-bold text-slate-600">
+                    ${checkoutSummary.subtotal?.toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex flex-col items-end flex-1">
+                  <span className="text-xs font-black text-amber-600 tracking-widest uppercase">
+                    應收金額
+                  </span>
+                  <span className="text-3xl md:text-4xl font-black font-mono text-emerald-600">
+                    ${checkoutSummary.finalTotal?.toLocaleString()}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCheckoutSummary(null)}
+                  className="px-6 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-base shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 shrink-0"
+                >
+                  <span className="text-xl">✔</span>
+                  <span>確認結帳</span>
                 </button>
               </div>
             </div>
