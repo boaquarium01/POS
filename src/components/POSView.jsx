@@ -29,16 +29,18 @@ export default function POSView({ products = [], fetchProducts, fetchOrders }) {
     return () => window.removeEventListener('keydown', handleKey);
   }, [checkoutSummary]);
 
-  // 結帳摘要清單動態字級：品項少時放大、品項多時縮小
+  // 結帳摘要清單動態佈局：品項越多字越小、間隔越扁
   const summaryItemCount = checkoutSummary?.items?.length || 0;
-  const baseRowFont = 14; // px
+  const baseRowFont = 14;
   let summaryRowFontScale = 1;
   if (summaryItemCount > 0 && summaryItemCount <= 12) {
-    summaryRowFontScale = 1 + ((12 - summaryItemCount) / 12) * 0.4;
+    summaryRowFontScale = 1 + ((12 - summaryItemCount) / 12) * 1.0;
   } else if (summaryItemCount > 12) {
     summaryRowFontScale = 1 - Math.min(0.4, ((summaryItemCount - 12) / 12) * 0.4);
   }
   const summaryRowFontSize = baseRowFont * summaryRowFontScale;
+  // 品項越多壓縮上下空間 (從 py-3.5 壓縮至 py-0.5)
+  const summaryRowPadding = summaryItemCount > 20 ? 'py-0.5' : summaryItemCount > 12 ? 'py-1' : summaryItemCount > 8 ? 'py-1.5' : 'py-2';
 
   // --- 3. 彈窗控制 (中控式 Numpad) ---
   const [modalType, setModalType] = useState(null); // 'numpad' | 'expense' | 'cart_edit'
@@ -270,12 +272,12 @@ export default function POSView({ products = [], fetchProducts, fetchOrders }) {
   };
 
   return (
-    <div className="flex h-full bg-slate-100 overflow-hidden font-sans">
+    <div className="relative flex h-full bg-slate-100 overflow-hidden font-sans">
 
       {/* 統一中控彈窗 */}
       {modalType && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4"
+          className="absolute inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4"
           onClick={() => setModalType(null)}
         >
           <div
@@ -391,117 +393,126 @@ export default function POSView({ products = [], fetchProducts, fetchOrders }) {
         </div>
       )}
 
-      {/* 結帳完成摘要彈窗：幾乎滿版，重點顯示清單與底部橫向金額總結 */}
+      {/* 結帳完成摘要彈窗 */}
       {checkoutSummary && (
         <div
-          className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4"
+          className="absolute inset-0 z-[110] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm"
           onClick={() => setCheckoutSummary(null)}
         >
           <div
-            className="bg-white w-[48vw] max-w-3xl min-w-[320px] h-[98vh] max-h-[98vh] rounded-[2.5rem] shadow-2xl border border-white animate-in zoom-in duration-200 flex flex-col gap-4 overflow-hidden"
+            className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 flex flex-col overflow-hidden"
+            style={{ width: 720, height: 800 }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* 標題 + 日期時間 */}
-            <div className="flex items-center justify-between gap-4 border-b border-slate-100 pb-3 pt-4 px-6 shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-emerald-500 flex items-center justify-center text-2xl">
-                  ✅
-                </div>
-                <div className="space-y-1">
-                  <div className="text-base font-black text-emerald-700 tracking-widest uppercase">
-                    結帳完成
+
+            {/* ── 頂部：質感標題列 + 壓縮資訊卡 ── */}
+            <div className="shrink-0 bg-white px-8 pt-5 pb-4 border-b border-slate-100">
+              {/* 標題行 */}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-3xl shadow-sm text-emerald-500">
+                    <span className="mb-1">✓</span>
                   </div>
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100">
-                    <span className="text-[11px] font-black text-slate-500">日期時間</span>
-                    <span className="text-sm font-mono font-black text-slate-800">
-                      {checkoutSummary.createdAt
-                        ? formatDateTime(checkoutSummary.createdAt)
-                        : formatDateTime(new Date().toISOString())}
-                    </span>
+                  <div>
+                    <h2 className="text-2xl font-black text-slate-800 tracking-tight">結帳完成</h2>
+                    <p className="text-xs font-bold text-slate-400">交易已成功處理</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm font-mono font-black text-slate-600 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
+                    {checkoutSummary.createdAt
+                      ? formatDateTime(checkoutSummary.createdAt)
+                      : formatDateTime(new Date().toISOString())}
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* 客戶資訊列 */}
-            <div className="px-6 shrink-0">
-              <div className="bg-slate-50 rounded-2xl px-4 py-3 flex justify-between items-center text-sm">
-                <div className="space-y-1">
-                  <div className="font-black text-slate-700 text-sm">
-                    客戶：{checkoutSummary.memberName}
-                  </div>
-                  <div className="text-xs font-mono text-slate-500">
-                    手機：{checkoutSummary.memberPhone || '—'}
-                  </div>
-                </div>
-                <div className="text-right text-xs font-black text-slate-400">
-                  支付方式
-                  <div className="mt-0.5 text-sm font-black text-slate-800">
-                    {checkoutSummary.paymentMethod}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* 購物清單：中間主體，可捲動（字級依品項數動態調整） */}
-            <div className="px-6 flex-1 min-h-0">
-              <div className="border-2 border-slate-100 rounded-2xl overflow-hidden h-full flex flex-col">
-                {/* 表頭 */}
-                <div className="bg-slate-50 px-4 py-2 text-xs font-black text-slate-500 flex shrink-0">
-                  <div className="flex-1">品名</div>
-                  <div className="w-16 text-right">數量</div>
-                  <div className="w-24 text-right">單價</div>
-                  <div className="w-28 text-right">總價</div>
-                </div>
-                {/* 清單內容 */}
-                <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-slate-100 no-scrollbar">
-                  {checkoutSummary.items.map((item, idx) => (
-                    <div
-                      key={item.id || idx}
-                      className="px-4 py-2 font-bold text-slate-700 flex items-baseline"
-                      style={{ fontSize: `${summaryRowFontSize}px` }}
-                    >
-                      <div className="flex-1 truncate pr-3">{item.name}</div>
-                      <div className="w-16 text-right font-mono">{item.quantity}</div>
-                      <div className="w-24 text-right font-mono">
-                        ${Number(item.price).toLocaleString()}
-                      </div>
-                      <div className="w-28 text-right font-mono text-slate-900">
-                        ${Number(item.total).toLocaleString()}
-                      </div>
+              {/* 三格資訊卡 */}
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { label: '客戶名稱', value: checkoutSummary.memberName || '一般散客', icon: '👤', color: 'text-blue-500' },
+                  { label: '連絡電話', value: checkoutSummary.memberPhone || '無紀錄', icon: '📱', color: 'text-emerald-500' },
+                  { label: '支付方式', value: checkoutSummary.paymentMethod, icon: '💳', color: 'text-amber-500' },
+                ].map(({ label, value, icon, color }) => (
+                  <div key={label} className="bg-slate-50/80 rounded-2xl p-3 border border-slate-100 hover:bg-slate-50 transition-colors">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="text-sm">{icon}</span>
+                      <span className="text-xs font-black text-slate-400 tracking-wider font-sans uppercase">{label}</span>
                     </div>
-                  ))}
-                </div>
+                    <div className={`text-xl font-black text-slate-800 break-all leading-tight font-sans`}>{value}</div>
+                  </div>
+                ))}
               </div>
             </div>
 
-            {/* 底部：小計 + 應收金額 與 確認按鈕同列 */}
-            <div className="px-6 pb-6 pt-4 shrink-0">
-              <div className="bg-slate-50 rounded-2xl px-5 py-4 flex items-center justify-between gap-4 border border-slate-200">
-                <div className="flex flex-col text-slate-500">
-                  <span className="text-[10px] font-bold tracking-wide uppercase">小計</span>
-                  <span className="text-sm font-mono font-bold text-slate-600">
-                    ${checkoutSummary.subtotal?.toLocaleString()}
-                  </span>
+            {/* ── 中間：購物清單（可捲動） ── */}
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden bg-white px-2">
+              {/* 表頭 (與內容對齊並放大文字) */}
+              <div className="px-6 py-1 flex shrink-0 items-center gap-2 border-b border-slate-50">
+                <div className="w-6 shrink-0" /> {/* 序號佔位 */}
+                <div className="flex-1 text-sm font-black text-slate-500 uppercase tracking-widest">商品品名 / 規格</div>
+                <div className="w-16 text-center text-sm font-black text-slate-500 uppercase tracking-widest">數量</div>
+                <div className="w-32 text-left text-sm font-black text-slate-500 uppercase tracking-widest pl-2">單價</div>
+                <div className="w-36 text-left text-sm font-black text-slate-500 uppercase tracking-widest pl-2">總額</div>
+              </div>
+
+              <div className="w-full h-px bg-gradient-to-r from-transparent via-slate-100 to-transparent mx-auto" />
+
+              {/* 清單內容 */}
+              <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-slate-200/50 no-scrollbar px-6 py-2">
+                {checkoutSummary.items.map((item, idx) => (
+                  <div
+                    key={item.id || idx}
+                    className={`font-bold flex items-center gap-2 hover:bg-emerald-50/50 rounded-lg px-2 -mx-2 transition-colors ${summaryRowPadding} ${idx % 2 === 0 ? 'bg-slate-100/80' : 'bg-white'}`}
+                    style={{ fontSize: `${summaryRowFontSize}px` }}
+                  >
+                    <div className="w-6 shrink-0 text-slate-600 font-mono text-[11px] font-black tracking-tighter">{String(idx + 1).padStart(2, '0')}</div>
+                    <div className="flex-1 break-words leading-snug pr-2 text-slate-900">{item.name}</div>
+                    <div className="w-16 text-center font-mono shrink-0 text-slate-600 font-black" style={{ fontSize: `${summaryRowFontSize * 1.3}px` }}>{item.quantity}</div>
+                    <div className="w-32 text-left pl-2 font-mono shrink-0 text-slate-600 font-black tabular-nums" style={{ fontSize: `${summaryRowFontSize * 1.3}px` }}>${Number(item.price).toLocaleString()}</div>
+                    <div className="w-36 text-left pl-2 font-mono font-black text-slate-900 shrink-0 tabular-nums" style={{ fontSize: `${summaryRowFontSize * 1.3}px` }}>${Number(item.total).toLocaleString()}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ── 底部：金額摘要 + 離開按鈕 ── */}
+            <div className="shrink-0 border-t border-slate-100 bg-white py-4 px-8">
+              <div className="flex items-center justify-between gap-8">
+                <div className="flex items-center gap-8">
+                  {/* 小計 */}
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-1">商品小計</span>
+                    <span className="text-xl font-mono font-black text-slate-400">${checkoutSummary.subtotal?.toLocaleString()}</span>
+                  </div>
+
+                  {/* 分隔線 */}
+                  <div className="w-px h-8 bg-slate-100" />
+
+                  {/* 應收（主要） */}
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">應收總計</span>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-sm font-black text-emerald-600 font-mono">$</span>
+                      <span className="text-5xl font-black font-mono text-emerald-600 leading-none tracking-tighter">
+                        {checkoutSummary.finalTotal?.toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex flex-col items-end flex-1">
-                  <span className="text-xs font-black text-amber-600 tracking-widest uppercase">
-                    應收金額
-                  </span>
-                  <span className="text-3xl md:text-4xl font-black font-mono text-emerald-600">
-                    ${checkoutSummary.finalTotal?.toLocaleString()}
-                  </span>
-                </div>
+
+                {/* 離開按鈕 */}
                 <button
                   type="button"
                   onClick={() => setCheckoutSummary(null)}
-                  className="px-6 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-base shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 shrink-0"
+                  className="px-10 py-5 rounded-2xl bg-slate-900 hover:bg-black text-white font-black text-lg shadow-xl shadow-slate-200 active:scale-95 transition-all flex items-center gap-3 shrink-0"
                 >
-                  <span className="text-xl">✔</span>
-                  <span>確認結帳</span>
+                  <span className="text-xl opacity-50">✕</span>
+                  <span>離開視窗</span>
                 </button>
               </div>
             </div>
+
           </div>
         </div>
       )}
