@@ -14,15 +14,16 @@ export default function OrdersView() {
   const todayStr = new Date().toLocaleDateString('en-CA')
   const [startDate, setStartDate] = useState(todayStr)
   const [endDate, setEndDate] = useState(todayStr)
+  const [activeFilter, setActiveFilter] = useState('today')
 
   useEffect(() => { fetchData() }, [startDate, endDate])
 
   async function fetchData() {
     try {
       setLoading(true)
-      // 計算該日期的本地起點與終點，並轉成 ISO (UTC) 時間字串給 Supabase 查詢
-      const startOfDay = new Date(`${startDate}T00:00:00`).toISOString()
-      const endOfDay = new Date(`${endDate}T23:59:59.999`).toISOString()
+      // 直接使用本地時間字串，配合資料庫 timestamp without time zone 欄位
+      const startOfDay = `${startDate}T00:00:00`
+      const endOfDay = `${endDate}T23:59:59.999`
 
       const { data: ordersData } = await supabase
         .from('orders')
@@ -75,10 +76,10 @@ export default function OrdersView() {
     const revenue = orders.reduce((sum, o) => sum + (o.total_amount || 0), 0)
     const expense = expenses.reduce((sum, e) => sum + (e.amount || 0), 0)
     const byMethod = orders.reduce((acc, o) => {
-      const method = o.payment_method || '現金'
+      const method = o.payment_method || '現金支付'
       acc[method] = (acc[method] || 0) + (o.total_amount || 0)
       return acc
-    }, { '現金': 0, '轉帳': 0, '刷卡': 0 })
+    }, { '現金支付': 0, '轉帳支付': 0, '刷卡支付': 0 })
     return { revenue, expense, byMethod }
   }, [orders, expenses])
 
@@ -131,20 +132,25 @@ export default function OrdersView() {
       )}
 
       {/* 頂部篩選欄 */}
-      <div className="bg-white px-8 py-3 shadow-md z-20 flex items-center justify-between">
+      <div className="bg-white px-8 py-4 shadow-md z-20 flex items-center justify-between">
         <div className="flex items-center gap-6">
           <h2 className="text-2xl font-black tracking-tighter text-slate-800">帳務分析系統</h2>
-          <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
-            <button onClick={() => { setStartDate(todayStr); setEndDate(todayStr) }} className={`px-4 py-1.5 rounded-lg font-black text-xs transition-all ${startDate === todayStr ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800'}`}>今日紀錄</button>
+          <div className="flex bg-slate-100 p-1.5 rounded-2xl gap-1.5">
+            <button onClick={() => { setStartDate(todayStr); setEndDate(todayStr); setActiveFilter('today') }} className={`px-6 py-2.5 rounded-xl font-black text-base transition-all ${activeFilter === 'today' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-800 hover:bg-white'}`}>今日</button>
             <button onClick={() => {
               const start = new Date(); start.setDate(start.getDate() - 6);
-              setStartDate(start.toLocaleDateString('en-CA')); setEndDate(todayStr);
-            }} className={`px-4 py-1.5 rounded-lg font-black text-xs transition-all ${startDate !== todayStr ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800'}`}>最近一週</button>
+              setStartDate(start.toLocaleDateString('en-CA')); setEndDate(todayStr); setActiveFilter('week');
+            }} className={`px-6 py-2.5 rounded-xl font-black text-base transition-all ${activeFilter === 'week' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-800 hover:bg-white'}`}>一週</button>
+            <button onClick={() => {
+              const now = new Date();
+              const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+              setStartDate(monthStart.toLocaleDateString('en-CA')); setEndDate(todayStr); setActiveFilter('month');
+            }} className={`px-6 py-2.5 rounded-xl font-black text-base transition-all ${activeFilter === 'month' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-800 hover:bg-white'}`}>本月</button>
           </div>
-          <div className="flex items-center gap-2 bg-slate-50 px-3 py-1 rounded-xl border border-slate-200 text-xs font-bold">
-            <input type="date" className="bg-transparent outline-none" value={startDate} onChange={e => setStartDate(e.target.value)} />
-            <span className="text-slate-400 font-black">-</span>
-            <input type="date" className="bg-transparent outline-none" value={endDate} onChange={e => setEndDate(e.target.value)} />
+          <div className="flex items-center gap-3 bg-slate-50 px-5 py-2.5 rounded-2xl border-2 border-slate-200 text-base font-bold">
+            <input type="date" className="bg-transparent outline-none text-base font-black" value={startDate} onChange={e => { setStartDate(e.target.value); setActiveFilter(null) }} />
+            <span className="text-slate-400 font-black text-lg">—</span>
+            <input type="date" className="bg-transparent outline-none text-base font-black" value={endDate} onChange={e => { setEndDate(e.target.value); setActiveFilter(null) }} />
           </div>
         </div>
 
@@ -191,11 +197,11 @@ export default function OrdersView() {
                         {order.members?.name || '一般散客'}
                       </td>
                       <td className="p-5 text-center">
-                        <span className={`px-4 py-1.5 rounded-lg font-black text-sm ${order.payment_method === '現金' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' :
-                            order.payment_method === '轉帳' ? 'bg-blue-100 text-blue-700 border border-blue-200' :
-                              'bg-purple-100 text-purple-700 border border-purple-200'
+                        <span className={`px-4 py-1.5 rounded-lg font-black text-sm ${order.payment_method === '現金支付' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' :
+                          order.payment_method === '轉帳支付' ? 'bg-blue-100 text-blue-700 border border-blue-200' :
+                            'bg-purple-100 text-purple-700 border border-purple-200'
                           }`}>
-                          {order.payment_method || '現金'}
+                          {order.payment_method || '現金支付'}
                         </span>
                       </td>
                       <td className="p-5 text-right font-black">
@@ -220,7 +226,7 @@ export default function OrdersView() {
                               </div>
                             ))}
                             <div className="pt-4 flex justify-between items-center">
-                              <span className="text-slate-600 font-black text-sm">備註：{order.note || '無'}</span>
+                              <span className="text-slate-600 font-black text-sm">折扣：{order.discount_info || '無'}</span>
                               <div className="text-3xl font-black text-blue-700 font-mono underline decoration-blue-200 decoration-4">實收：${order.total_amount.toLocaleString()}</div>
                             </div>
                           </div>
@@ -241,16 +247,16 @@ export default function OrdersView() {
           <div className="bg-white p-6 rounded-[2rem] shadow-xl border-2 border-slate-100 space-y-4">
             <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest border-b-2 border-slate-50 pb-3">收款方式統計</h3>
             <div className="flex justify-between items-center bg-emerald-50 p-4 rounded-2xl border-2 border-emerald-200">
-              <span className="text-emerald-800 font-black text-lg">💵 現金</span>
-              <span className="text-2xl font-black font-mono text-emerald-900">${stats.byMethod['現金'].toLocaleString()}</span>
+              <span className="text-emerald-800 font-black text-lg">💵 現金支付</span>
+              <span className="text-2xl font-black font-mono text-emerald-900">${stats.byMethod['現金支付'].toLocaleString()}</span>
             </div>
             <div className="flex justify-between items-center bg-blue-50 p-4 rounded-2xl border-2 border-blue-200">
-              <span className="text-blue-800 font-black text-lg">📱 轉帳</span>
-              <span className="text-2xl font-black font-mono text-blue-900">${stats.byMethod['轉帳'].toLocaleString()}</span>
+              <span className="text-blue-800 font-black text-lg">📱 轉帳支付</span>
+              <span className="text-2xl font-black font-mono text-blue-900">${stats.byMethod['轉帳支付'].toLocaleString()}</span>
             </div>
             <div className="flex justify-between items-center bg-purple-50 p-4 rounded-2xl border-2 border-purple-200">
-              <span className="text-purple-800 font-black text-lg">💳 刷卡</span>
-              <span className="text-2xl font-black font-mono text-purple-900">${stats.byMethod['刷卡'].toLocaleString()}</span>
+              <span className="text-purple-800 font-black text-lg">💳 刷卡支付</span>
+              <span className="text-2xl font-black font-mono text-purple-900">${stats.byMethod['刷卡支付'].toLocaleString()}</span>
             </div>
           </div>
 
